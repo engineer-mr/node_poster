@@ -4,12 +4,12 @@
 
 ```bash
 npm install
-npm install -g pm2
 ```
 
 ## 启动（本地直接 npm run start ）
 
 ```bash
+npm install -g pm2
 PORT=3000 pm2 start index.js --name poster-api-3000 -- --server
 pm2 save
 ```
