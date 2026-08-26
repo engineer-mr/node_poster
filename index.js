@@ -27,7 +27,7 @@ function defaultPoster({
 const basePoster = defaultPoster();
 
 const outputDir = path.join(__dirname, "output");
-const outputFile = path.join(outputDir, "poster.svg");
+const outputFile = path.join(outputDir, "poster.png");
 const port = Number(process.env.PORT || 3000);
 
 function escapeXml(value) {
@@ -136,6 +136,18 @@ async function renderPoster(data) {
   });
 }
 
+async function renderPosterPng(data) {
+  let sharp;
+  try {
+    sharp = require("sharp");
+  } catch (error) {
+    throw new Error('Missing dependency "sharp". Run "npm install" first.');
+  }
+
+  const svg = await renderPoster(data);
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
 function buildPosterFromParams(params = {}) {
   return defaultPoster({
     title: params.title ?? undefined,
@@ -147,7 +159,7 @@ function buildPosterFromParams(params = {}) {
 
 async function writePosterFile() {
   fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(outputFile, await renderPoster(basePoster), "utf8");
+  fs.writeFileSync(outputFile, await renderPosterPng(basePoster));
 
   console.log(`海报已生成: ${outputFile}`);
 }
@@ -163,9 +175,28 @@ function startServer() {
           [
             "Poster service is running.",
             "Try:",
-            `/poster.svg?title=${encodeURIComponent(basePoster.title)}&subtitle=${encodeURIComponent(basePoster.subtitle)}&date=${encodeURIComponent(basePoster.date)}&location=${encodeURIComponent(basePoster.location)}`,
+            `/poster.png?title=${encodeURIComponent(basePoster.title)}&subtitle=${encodeURIComponent(basePoster.subtitle)}&date=${encodeURIComponent(basePoster.date)}&location=${encodeURIComponent(basePoster.location)}`,
           ].join("\n")
         );
+        return;
+      }
+
+      if (requestUrl.pathname === "/poster.png") {
+        const png = await renderPosterPng(
+          buildPosterFromParams({
+            title: requestUrl.searchParams.get("title"),
+            subtitle: requestUrl.searchParams.get("subtitle"),
+            date: requestUrl.searchParams.get("date"),
+            location: requestUrl.searchParams.get("location"),
+          })
+        );
+
+        res.writeHead(200, {
+          "Content-Type": "image/png",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*",
+        });
+        res.end(png);
         return;
       }
 
@@ -200,7 +231,7 @@ function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`海报服务已启动: http://localhost:${port}`);
     console.log(
-      `示例: http://localhost:${port}/poster.svg?title=${encodeURIComponent(basePoster.title)}&subtitle=${encodeURIComponent(basePoster.subtitle)}&date=${encodeURIComponent(basePoster.date)}&location=${encodeURIComponent(basePoster.location)}`
+      `示例: http://localhost:${port}/poster.png?title=${encodeURIComponent(basePoster.title)}&subtitle=${encodeURIComponent(basePoster.subtitle)}&date=${encodeURIComponent(basePoster.date)}&location=${encodeURIComponent(basePoster.location)}`
     );
   });
 }
